@@ -17,7 +17,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; // Added Card imports
 import { Label } from "@/components/ui/label";
+import { UserPlus, Edit } from "lucide-react"; // Added icons
 import {
   Pagination,
   PaginationContent,
@@ -92,56 +94,107 @@ export function StudentsTab() {
   };
 
   return (
-    <div>
-      <div className="mb-4 flex justify-between">
-        <h2 className="text-2xl font-bold">Students</h2>
+    // Wrapped content in a styled Card
+    <Card className="border-glass-border/30 bg-glass/60 backdrop-blur-lg shadow-lg p-6">
+      <div className="mb-6 flex items-center justify-between">
+        {" "}
+        {/* Increased bottom margin */}
+        {/* Adjusted heading color */}
+        <h2 className="text-xl font-semibold text-glass-foreground">
+          Students List
+        </h2>
+        {/* Updated Add Student button */}
         <Button
+          variant="secondary" // Changed variant
           onClick={() => {
             setEditingStudent(null);
             setIsDialogOpen(true);
           }}
+          className="gap-2" // Added gap for icon
         >
+          <UserPlus className="h-4 w-4" /> {/* Added icon */}
           Add Student
         </Button>
       </div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Room Number</TableHead>
-            <TableHead>Amount Paid</TableHead>
-            <TableHead>Amount to Return</TableHead>
-            <TableHead>Last Month Due</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {paginatedStudents.map((student) => (
-            <TableRow key={student.id}>
-              <TableCell>{student.name}</TableCell>
-              <TableCell>{student.roomNumber}</TableCell>
-              <TableCell>₹{student.amountPaid.toFixed(2)}</TableCell>
-              <TableCell>₹{student.amountToReturn.toFixed(2)}</TableCell>
-              <TableCell>₹{student.lastMonthDue.toFixed(2)}</TableCell>
-              <TableCell>
-                <Button
-                  variant="outline"
-                  onClick={() => openEditDialog(student)}
-                >
-                  Edit
-                </Button>
-              </TableCell>
+      {/* Added overflow container for table */}
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            {/* Styled table header row */}
+            <TableRow className="border-b border-glass-border/30 hover:bg-white/5">
+              {/* Styled table head cells */}
+              <TableHead className="text-glass-foreground/80">Name</TableHead>
+              <TableHead className="text-glass-foreground/80">
+                Room Number
+              </TableHead>
+              <TableHead className="text-glass-foreground/80">
+                Amount Paid
+              </TableHead>
+              <TableHead className="text-glass-foreground/80">
+                Amount to Return
+              </TableHead>
+              <TableHead className="text-glass-foreground/80">
+                Last Month Due
+              </TableHead>
+              <TableHead className="text-glass-foreground/80 text-right">
+                Actions
+              </TableHead>{" "}
+              {/* Align Actions right */}
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      <div className="mt-4">
+          </TableHeader>
+          <TableBody>
+            {paginatedStudents.map((student) => (
+              // Styled table body row
+              <TableRow
+                key={student.id}
+                className="border-b border-glass-border/20 hover:bg-white/10"
+              >
+                {/* Styled table cells */}
+                <TableCell className="text-glass-foreground/90">
+                  {student.name}
+                </TableCell>
+                <TableCell className="text-glass-foreground/90">
+                  {student.roomNumber}
+                </TableCell>
+                <TableCell className="text-glass-foreground/90">
+                  ₹{student.amountPaid.toFixed(2)}
+                </TableCell>
+                <TableCell className="text-glass-foreground/90">
+                  ₹{student.amountToReturn.toFixed(2)}
+                </TableCell>
+                <TableCell className="text-glass-foreground/90">
+                  ₹{student.lastMonthDue.toFixed(2)}
+                </TableCell>
+                {/* Styled Actions cell and Edit button */}
+                <TableCell className="text-right">
+                  <Button
+                    variant="ghost" // Changed variant
+                    size="icon" // Made button icon-sized
+                    className="text-glass-foreground/70 hover:bg-white/10 hover:text-glass-foreground" // Added hover styles
+                    onClick={() => openEditDialog(student)}
+                  >
+                    <Edit className="h-4 w-4" /> {/* Added icon */}
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>{" "}
+      {/* Close overflow container */}
+      {/* Styled Pagination */}
+      <div className="mt-6 flex justify-center">
+        {" "}
+        {/* Increased margin and centered */}
         <Pagination>
-          <PaginationContent>
+          <PaginationContent className="gap-1">
+            {" "}
+            {/* Added gap */}
             <PaginationItem>
               <PaginationPrevious
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                 className={cn(
+                  "text-glass-foreground/70 hover:bg-white/10 hover:text-glass-foreground", // Added styles
                   currentPage === 1 && "pointer-events-none opacity-50"
                 )}
               />
@@ -151,6 +204,12 @@ export function StudentsTab() {
                 <PaginationLink
                   onClick={() => setCurrentPage(i + 1)}
                   isActive={currentPage === i + 1}
+                  // Added styles for active and inactive states
+                  className={cn(
+                    "text-glass-foreground/70 hover:bg-white/10 hover:text-glass-foreground",
+                    currentPage === i + 1 &&
+                      "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+                  )}
                 >
                   {i + 1}
                 </PaginationLink>
@@ -162,6 +221,7 @@ export function StudentsTab() {
                   setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                 }
                 className={cn(
+                  "text-glass-foreground/70 hover:bg-white/10 hover:text-glass-foreground", // Added styles
                   currentPage === totalPages && "pointer-events-none opacity-50"
                 )}
               />
@@ -170,9 +230,11 @@ export function StudentsTab() {
         </Pagination>
       </div>
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        {/* Styled Dialog Content */}
+        <DialogContent className="border-glass-border/30 bg-glass/80 backdrop-blur-xl shadow-xl text-glass-foreground">
           <DialogHeader>
-            <DialogTitle>
+            {/* Adjusted title color */}
+            <DialogTitle className="text-glass-foreground">
               {editingStudent ? "Edit Student" : "Add New Student"}
             </DialogTitle>
           </DialogHeader>
@@ -183,6 +245,6 @@ export function StudentsTab() {
           />
         </DialogContent>
       </Dialog>
-    </div>
+    </Card> // Replaced final div with Card closing tag
   );
 }

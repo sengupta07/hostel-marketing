@@ -77,28 +77,46 @@ export function Overview() {
         <SummaryCard
           title="Amount Per Student"
           value={amountPerStudent}
-          icon={<ArrowUpIcon className="h-4 w-4 text-yellow-500" />}
+          icon={<ArrowUpIcon className="h-4 w-4 text-yellow-500" />} // Kept icon colors as is for now, can be themed later
         />
       </div>
-      <Card>
+      {/* Applied glassmorphism style to the Recent Bills card */}
+      <Card className="border-glass-border/30 bg-glass/60 backdrop-blur-lg shadow-lg">
         <CardHeader>
-          <CardTitle>Recent Bills</CardTitle>
+          {/* Adjusted title color */}
+          <CardTitle className="text-glass-foreground">Recent Bills</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Total Amount</TableHead>
-                <TableHead>Students</TableHead>
+              {/* Added border to table header row */}
+              <TableRow className="border-b border-glass-border/30 hover:bg-white/5">
+                {/* Adjusted header cell style */}
+                <TableHead className="text-glass-foreground/80">Date</TableHead>
+                <TableHead className="text-glass-foreground/80">
+                  Total Amount
+                </TableHead>
+                <TableHead className="text-glass-foreground/80">
+                  Students
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {recentBills.map((bill) => (
-                <TableRow key={bill.id}>
-                  <TableCell>{bill.date}</TableCell>
-                  <TableCell>₹{bill.totalAmount.toFixed(2)}</TableCell>
-                  <TableCell>{bill.students.join(", ")}</TableCell>
+                // Removed misplaced comments
+                <TableRow
+                  key={bill.id}
+                  className="border-b border-glass-border/20 hover:bg-white/10"
+                >
+                  <TableCell className="text-glass-foreground/90">
+                    {bill.date}
+                  </TableCell>
+                  <TableCell className="text-glass-foreground/90">
+                    ₹{bill.totalAmount.toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-glass-foreground/90">
+                    {bill.students.join(", ")}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

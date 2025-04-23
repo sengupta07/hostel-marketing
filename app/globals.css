@@ -112,6 +112,13 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Add a subtle background pattern or gradient */
+    background-image: linear-gradient(
+      to bottom right,
+      hsl(var(--background)) 20%,
+      hsl(var(--primary) / 0.1)
+    );
+    background-attachment: fixed; /* Keep the background fixed during scroll */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
