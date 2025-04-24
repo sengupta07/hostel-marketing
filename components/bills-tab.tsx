@@ -16,6 +16,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+// Import Drawer components
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 import { Label } from "@/components/ui/label";
 import { FilePlus, Edit, CalendarIcon } from "lucide-react";
 import {
@@ -40,7 +51,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, saveToLocalStorage, loadFromLocalStorage } from "@/lib/utils"; // Import LS utils
+import { useIsMobile } from "@/hooks/use-mobile"; // Import useIsMobile hook
 import { Card } from "@/components/ui/card"; // Ensure correct import path
 
 // --- Import Interfaces from the Single Source of Truth ---
@@ -56,6 +68,7 @@ import { BillForm, Bill, MarketingItem } from "./bill-form";
 // npm install uuid
 // npm install --save-dev @types/uuid
 
+const BILLS_STORAGE_KEY = "hostelMarketingApp_bills"; // Define storage key
 const ITEMS_PER_PAGE = 12;
 
 // Helper to create initial MarketingItem list (matching BillForm's definition)
@@ -86,66 +99,32 @@ const createInitialMarketingItems = (): MarketingItem[] => [
 ];
 
 export function BillsTab() {
-  // --- State using the imported Bill type ---
-  const [bills, setBills] = useState<Bill[]>([
-    // Example initial bill using the CORRECT structure
-    {
-      id: "1", // String ID
-      date: new Date("2023-08-01"),
-      students: ["John Doe", "Jane Smith"],
-      // Use marketingItems array
-      marketingItems: [
-        // Example populated items - align with createInitialMarketingItems structure
-        {
-          id: "pogg",
-          label: "Potato/Onion/Garlic/Ginger",
-          enabled: true,
-          amount: 300,
-          isEditing: false,
-        },
-        {
-          id: "veg",
-          label: "Vegetables",
-          enabled: true,
-          amount: 500,
-          isEditing: false,
-        },
-        {
-          id: "egg",
-          label: "Egg",
-          enabled: true,
-          amount: 200,
-          isEditing: false,
-        },
-        {
-          id: "fish",
-          label: "Fish",
-          enabled: true,
-          amount: 400,
-          isEditing: false,
-        },
-        {
-          id: "chicken",
-          label: "Chicken",
-          enabled: true,
-          amount: 600,
-          isEditing: false,
-        },
-      ],
-      // Ensure totals match the items above
-      marketingTotal: 2000,
-      groceryTotal: 1000,
-      totalBillAmount: 3000,
-      amountGiven: 3500,
-      amountReturned: 500,
-    },
-  ]);
+  // --- State using the imported Bill type, loaded from local storage ---
+  const [bills, setBills] = useState<Bill[]>(() => {
+    const savedBills = loadFromLocalStorage<Bill[]>(BILLS_STORAGE_KEY);
+    if (savedBills) {
+      // IMPORTANT: Convert date strings back to Date objects
+      return savedBills.map((bill) => ({
+        ...bill,
+        date: new Date(bill.date), // Parse the date string
+      }));
+    }
+    // Provide a default empty array if nothing is saved
+    // Provide a default empty array if nothing is saved
+    return [];
+  });
+
+  // Save bills to local storage whenever the state changes
+  useEffect(() => {
+    saveToLocalStorage(BILLS_STORAGE_KEY, bills);
+  }, [bills]);
 
   const [editingBill, setEditingBill] = useState<Bill | null>(null); // State uses correct Bill type
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [filterDate, setFilterDate] = useState<Date | undefined>(undefined);
   const [filterStudent, setFilterStudent] = useState<string>("");
+  const isMobile = useIsMobile(); // Use the hook
 
   // --- Memos and Effects (should be fine if using correct Bill type) ---
   const filteredBills = useMemo(() => {
@@ -216,6 +195,16 @@ export function BillsTab() {
     setEditingBill(null);
     setIsDialogOpen(true);
   };
+
+  // --- Reusable Bill Form Component ---
+  const BillFormComponent = (
+    <BillForm
+      key={editingBill?.id ?? "new"} // Pass string | "new"
+      initialData={editingBill} // Pass Bill (id: string) | null - THIS NOW MATCHES
+      onSubmit={handleAddOrUpdateBill} // Pass function expecting Bill (id: string) - THIS NOW MATCHES
+      submitButtonText={editingBill ? "Update Bill" : "Add Bill"}
+    />
+  );
 
   // --- Render ---
   return (
@@ -417,23 +406,44 @@ export function BillsTab() {
         </Pagination>
       </div>
 
-      {/* Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto border-glass-border/30 bg-glass/80 backdrop-blur-xl shadow-xl text-glass-foreground">
-          <DialogHeader>
-            <DialogTitle className="text-glass-foreground">
-              {editingBill ? "Edit Bill" : "Add New Bill"}
-            </DialogTitle>
-          </DialogHeader>
-          {/* --- BillForm Props Now Match --- */}
-          <BillForm
-            key={editingBill?.id ?? "new"} // Pass string | "new"
-            initialData={editingBill} // Pass Bill (id: string) | null - THIS NOW MATCHES
-            onSubmit={handleAddOrUpdateBill} // Pass function expecting Bill (id: string) - THIS NOW MATCHES
-            submitButtonText={editingBill ? "Update Bill" : "Add Bill"}
-          />
-        </DialogContent>
-      </Dialog>
+      {/* Conditional Rendering: Drawer for Mobile, Dialog for Desktop */}
+      {isMobile ? (
+        <Drawer open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          {/* DrawerTrigger could be used here if needed, but we trigger manually */}
+          <DrawerContent className="border-glass-border/30 bg-glass/80 backdrop-blur-xl text-glass-foreground max-h-[90vh]">
+            <DrawerHeader className="text-left">
+              <DrawerTitle className="text-glass-foreground">
+                {editingBill ? "Edit Bill" : "Add New Bill"}
+              </DrawerTitle>
+              {/* <DrawerDescription>...</DrawerDescription> */}
+            </DrawerHeader>
+            {/* Scrollable content area for Drawer */}
+            <div className="overflow-y-auto p-4">{BillFormComponent}</div>
+            <DrawerFooter className="pt-2">
+              <DrawerClose asChild>
+                <Button variant="outline">Cancel</Button>
+              </DrawerClose>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[80vh] border-glass-border/30 bg-glass/80 backdrop-blur-xl shadow-xl text-glass-foreground">
+            {/* DialogHeader is sticky due to previous changes */}
+            <DialogHeader>
+              <DialogTitle className="text-glass-foreground">
+                {editingBill ? "Edit Bill" : "Add New Bill"}
+              </DialogTitle>
+            </DialogHeader>
+            {/* Scrollable content area for Dialog */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {BillFormComponent}
+            </div>
+            {/* Optional: Add a DialogFooter here if needed */}
+            {/* <DialogFooter>...</DialogFooter> */}
+          </DialogContent>
+        </Dialog>
+      )}
     </Card>
   );
 }

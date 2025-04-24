@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react"; // Import useEffect
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,8 +28,10 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { cn } from "@/lib/utils";
+import { cn, saveToLocalStorage, loadFromLocalStorage } from "@/lib/utils"; // Import LS utils
 import { StudentForm } from "./student-form";
+
+const STUDENTS_STORAGE_KEY = "hostelMarketingApp_students"; // Define storage key
 
 export interface Student {
   id: number;
@@ -43,24 +45,18 @@ export interface Student {
 const ITEMS_PER_PAGE = 12;
 
 export function StudentsTab() {
-  const [students, setStudents] = useState<Student[]>([
-    {
-      id: 1,
-      name: "John Doe",
-      roomNumber: "101",
-      amountPaid: 2500,
-      amountToReturn: 0,
-      lastMonthDue: 0,
-    },
-    {
-      id: 2,
-      name: "Jane Smith",
-      roomNumber: "102",
-      amountPaid: 2300,
-      amountToReturn: 200,
-      lastMonthDue: 100,
-    },
-  ]);
+  // Load initial students from local storage or use default if none/error
+  const [students, setStudents] = useState<Student[]>(() => {
+    const savedStudents = loadFromLocalStorage<Student[]>(STUDENTS_STORAGE_KEY);
+    // Provide a default empty array if nothing is saved
+    // Provide a default empty array if nothing is saved
+    return savedStudents || [];
+  });
+
+  // Save students to local storage whenever the state changes
+  useEffect(() => {
+    saveToLocalStorage(STUDENTS_STORAGE_KEY, students);
+  }, [students]);
 
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -238,13 +234,20 @@ export function StudentsTab() {
               {editingStudent ? "Edit Student" : "Add New Student"}
             </DialogTitle>
           </DialogHeader>
-          <StudentForm
-            initialData={editingStudent}
-            onSubmit={handleAddOrUpdateStudent}
-            submitButtonText={editingStudent ? "Update Student" : "Add Student"}
-          />
+          {/* --- Scrollable Content Area --- */}
+          <div className="flex-1 overflow-y-auto p-6">
+            <StudentForm
+              initialData={editingStudent}
+              onSubmit={handleAddOrUpdateStudent}
+              submitButtonText={
+                editingStudent ? "Update Student" : "Add Student"
+              }
+            />
+          </div>
+          {/* Optional: Add a DialogFooter here if needed */}
+          {/* <DialogFooter>...</DialogFooter> */}
         </DialogContent>
       </Dialog>
-    </Card> // Replaced final div with Card closing tag
+    </Card>
   );
 }
