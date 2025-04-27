@@ -76,12 +76,12 @@ export const budgetApiSlice = apiSlice.injectEndpoints({
     }),
 
     // Create a payment intent for Stripe (Boarder)
-    createPaymentIntent: builder.mutation<CreatePaymentIntentResponse, void>({
-      query: () => ({
-        url: "/budget/pay",
-        method: "POST",
-      }),
-    }),
+    // createPaymentIntent: builder.mutation<CreatePaymentIntentResponse, void>({
+    //   query: () => ({
+    //     url: "/budget/pay",
+    //     method: "POST",
+    //   }),
+    // }),
 
     // Finalize the mess budget cycle (Mess Manager)
     finishBudgetCycle: builder.mutation<BudgetCycle, string>({
@@ -122,7 +122,7 @@ export const {
   useGetBudgetCycleByIdQuery,
   useGetMyBudgetStatusQuery,
   useGetBudgetOverviewQuery,
-  useCreatePaymentIntentMutation,
+  //   useCreatePaymentIntentMutation,
   useFinishBudgetCycleMutation,
   useCreateBudgetCycleMutation,
 } = budgetApiSlice;
