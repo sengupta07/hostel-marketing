@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react"; // Import useEffect
+"use client";
+
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,9 +19,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; // Added Card imports
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { UserPlus, Edit } from "lucide-react"; // Added icons
+import { UserPlus, Edit } from "lucide-react";
 import {
   Pagination,
   PaginationContent,
@@ -28,32 +30,20 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { cn, saveToLocalStorage, loadFromLocalStorage } from "@/lib/utils"; // Import LS utils
+import { cn, saveToLocalStorage, loadFromLocalStorage } from "@/lib/utils";
 import { StudentForm } from "./student-form";
+import type { Student } from "@/types";
 
-const STUDENTS_STORAGE_KEY = "hostelMarketingApp_students"; // Define storage key
-
-export interface Student {
-  id: number;
-  name: string;
-  roomNumber: string;
-  amountPaid: number;
-  amountToReturn: number;
-  lastMonthDue: number;
-}
+const STUDENTS_STORAGE_KEY = "hostelMarketingApp_students";
 
 const ITEMS_PER_PAGE = 12;
 
 export function StudentsTab() {
-  // Load initial students from local storage or use default if none/error
   const [students, setStudents] = useState<Student[]>(() => {
     const savedStudents = loadFromLocalStorage<Student[]>(STUDENTS_STORAGE_KEY);
-    // Provide a default empty array if nothing is saved
-    // Provide a default empty array if nothing is saved
     return savedStudents || [];
   });
 
-  // Save students to local storage whenever the state changes
   useEffect(() => {
     saveToLocalStorage(STUDENTS_STORAGE_KEY, students);
   }, [students]);
@@ -76,8 +66,9 @@ export function StudentsTab() {
         students.map((s) => (s.id === studentData.id ? studentData : s))
       );
     } else {
-      // TODO: Replace naive ID generation (students.length + 1) with a robust method (e.g., UUID or backend ID)
-      const newStudent = { ...studentData, id: students.length + 1 };
+      // FIXME: Replace naive ID generation with a robust method (e.g., UUID)
+      const newId = Date.now(); // Simple timestamp ID for now
+      const newStudent = { ...studentData, id: newId };
       setStudents([...students, newStudent]);
     }
     setEditingStudent(null);
@@ -90,35 +81,27 @@ export function StudentsTab() {
   };
 
   return (
-    // Wrapped content in a styled Card
     <Card className="border-glass-border/30 bg-glass/60 backdrop-blur-lg shadow-lg p-6">
       <div className="mb-6 flex items-center justify-between">
-        {" "}
-        {/* Increased bottom margin */}
-        {/* Adjusted heading color */}
         <h2 className="text-xl font-semibold text-glass-foreground">
           Students List
         </h2>
-        {/* Updated Add Student button */}
         <Button
-          variant="secondary" // Changed variant
+          variant="secondary"
           onClick={() => {
             setEditingStudent(null);
             setIsDialogOpen(true);
           }}
-          className="gap-2" // Added gap for icon
+          className="gap-2"
         >
-          <UserPlus className="h-4 w-4" /> {/* Added icon */}
+          <UserPlus className="h-4 w-4" />
           Add Student
         </Button>
       </div>
-      {/* Added overflow container for table */}
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
-            {/* Styled table header row */}
             <TableRow className="border-b border-glass-border/30 hover:bg-white/5">
-              {/* Styled table head cells */}
               <TableHead className="text-glass-foreground/80">Name</TableHead>
               <TableHead className="text-glass-foreground/80">
                 Room Number
@@ -134,18 +117,15 @@ export function StudentsTab() {
               </TableHead>
               <TableHead className="text-glass-foreground/80 text-right">
                 Actions
-              </TableHead>{" "}
-              {/* Align Actions right */}
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {paginatedStudents.map((student) => (
-              // Styled table body row
               <TableRow
                 key={student.id}
                 className="border-b border-glass-border/20 hover:bg-white/10"
               >
-                {/* Styled table cells */}
                 <TableCell className="text-glass-foreground/90">
                   {student.name}
                 </TableCell>
@@ -161,36 +141,29 @@ export function StudentsTab() {
                 <TableCell className="text-glass-foreground/90">
                   ₹{student.lastMonthDue.toFixed(2)}
                 </TableCell>
-                {/* Styled Actions cell and Edit button */}
                 <TableCell className="text-right">
                   <Button
-                    variant="ghost" // Changed variant
-                    size="icon" // Made button icon-sized
-                    className="text-glass-foreground/70 hover:bg-white/10 hover:text-glass-foreground" // Added hover styles
+                    variant="ghost"
+                    size="icon"
+                    className="text-glass-foreground/70 hover:bg-white/10 hover:text-glass-foreground"
                     onClick={() => openEditDialog(student)}
                   >
-                    <Edit className="h-4 w-4" /> {/* Added icon */}
+                    <Edit className="h-4 w-4" />
                   </Button>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
-      </div>{" "}
-      {/* Close overflow container */}
-      {/* Styled Pagination */}
+      </div>
       <div className="mt-6 flex justify-center">
-        {" "}
-        {/* Increased margin and centered */}
         <Pagination>
           <PaginationContent className="gap-1">
-            {" "}
-            {/* Added gap */}
             <PaginationItem>
               <PaginationPrevious
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                 className={cn(
-                  "text-glass-foreground/70 hover:bg-white/10 hover:text-glass-foreground", // Added styles
+                  "text-glass-foreground/70 hover:bg-white/10 hover:text-glass-foreground",
                   currentPage === 1 && "pointer-events-none opacity-50"
                 )}
               />
@@ -200,7 +173,6 @@ export function StudentsTab() {
                 <PaginationLink
                   onClick={() => setCurrentPage(i + 1)}
                   isActive={currentPage === i + 1}
-                  // Added styles for active and inactive states
                   className={cn(
                     "text-glass-foreground/70 hover:bg-white/10 hover:text-glass-foreground",
                     currentPage === i + 1 &&
@@ -217,7 +189,7 @@ export function StudentsTab() {
                   setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                 }
                 className={cn(
-                  "text-glass-foreground/70 hover:bg-white/10 hover:text-glass-foreground", // Added styles
+                  "text-glass-foreground/70 hover:bg-white/10 hover:text-glass-foreground",
                   currentPage === totalPages && "pointer-events-none opacity-50"
                 )}
               />
@@ -226,15 +198,12 @@ export function StudentsTab() {
         </Pagination>
       </div>
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        {/* Styled Dialog Content */}
         <DialogContent className="border-glass-border/30 bg-glass/80 backdrop-blur-xl shadow-xl text-glass-foreground">
           <DialogHeader>
-            {/* Adjusted title color */}
             <DialogTitle className="text-glass-foreground">
               {editingStudent ? "Edit Student" : "Add New Student"}
             </DialogTitle>
           </DialogHeader>
-          {/* --- Scrollable Content Area --- */}
           <div className="flex-1 overflow-y-auto p-6">
             <StudentForm
               initialData={editingStudent}
@@ -244,8 +213,6 @@ export function StudentsTab() {
               }
             />
           </div>
-          {/* Optional: Add a DialogFooter here if needed */}
-          {/* <DialogFooter>...</DialogFooter> */}
         </DialogContent>
       </Dialog>
     </Card>

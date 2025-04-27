@@ -1,0 +1,180 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL") // Neon DB connection string
+}
+
+enum UserRole {
+  BOARDER
+  MESS_MANAGER
+  GENERAL_SECRETARY
+}
+
+model User {
+  id            String        @id @default(cuid())
+  name          String?
+  email         String?       @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          UserRole      @default(BOARDER)
+  accounts      Account[]
+  sessions      Session[]
+
+  // Relationships
+  assignedMarketingTasks MarketingTask[] @relation("AssignedStudents")
+  submittedBills         Bill[]          @relation("SubmittedBy") // Relation for bills submitted by this user
+  payments               Payment[]
+  createdMarketingTasks  MarketingTask[] @relation("CreatedByMessManager")
+  managedExpenses        MiscellaneousExpense[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+enum MarketingTaskStatus {
+  ASSIGNED
+  BILL_SUBMITTED
+  COMPLETED
+}
+
+model MarketingTask {
+  id               String              @id @default(cuid())
+  date             DateTime            @db.Date
+  status           MarketingTaskStatus @default(ASSIGNED)
+  moneyGiven       Float?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  // Relationships
+  assignedStudents User[]              @relation("AssignedStudents")
+  bill             Bill?               // Relation to the Bill (one-to-one)
+  createdByUserId  String
+  createdByUser    User                @relation("CreatedByMessManager", fields: [createdByUserId], references: [id])
+}
+
+// --- MODIFIED Bill Model ---
+model Bill {
+  id              String   @id @default(cuid())
+  date            DateTime @db.Date            // Date from the form (when marketing happened/bill submitted)
+  marketingTotal  Float                       // Calculated total for marketing items
+  groceryTotal    Float                       // Grocery amount from form
+  totalBillAmount Float                       // Overall total (marketing + grocery)
+  amountGiven     Float                       // Amount given for the task (copied for reference)
+  moneyReturned   Float?                      // Calculated: amountGiven - totalBillAmount (can be negative if overspent)
+  description     String?                     // Optional description from form (if added)
+  receiptUrl      String?                     // Optional receipt URL from form (if added)
+  submittedAt     DateTime @default(now())    // When the record was created
+
+  // Relationships
+  marketingTaskId String        @unique // Each bill belongs to one marketing task
+  marketingTask   MarketingTask @relation(fields: [marketingTaskId], references: [id])
+  submittedById   String
+  submittedBy     User          @relation("SubmittedBy", fields: [submittedById], references: [id])
+
+  // Relation to NEW model storing item details
+  marketingItems  BillMarketingItem[]
+}
+// --- END MODIFIED Bill Model ---
+
+// --- NEW Model for Bill Marketing Items ---
+model BillMarketingItem {
+  id     String @id @default(cuid())
+  itemId String // Identifier like 'pogg', 'egg'
+  label  String // Label like 'Potato/Onion/Garlic/Ginger'
+  amount Float  // Cost for this item in this specific bill
+
+  // Relation back to the Bill
+  billId String
+  bill   Bill   @relation(fields: [billId], references: [id], onDelete: Cascade) // If Bill deleted, delete these items
+
+  @@index([billId]) // Index for faster lookups by bill
+}
+// --- END NEW Model ---
+
+model BudgetCycle {
+  id                    String                 @id @default(cuid())
+  month                 Int
+  year                  Int
+  startDate             DateTime               @db.Date
+  endDate               DateTime               @db.Date
+  paymentDeadline       DateTime               @db.Date
+  totalExpenditure      Float?
+  perHeadCost           Float?
+  isFinalized           Boolean                @default(false)
+  payments              Payment[]
+  miscellaneousExpenses MiscellaneousExpense[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([month, year])
+}
+
+model Payment {
+  id                    String      @id @default(cuid())
+  userId                String
+  user                  User        @relation(fields: [userId], references: [id])
+  budgetCycleId         String
+  budgetCycle           BudgetCycle @relation(fields: [budgetCycleId], references: [id])
+  amountPaid            Float
+  paymentDate           DateTime    @default(now())
+  stripePaymentIntentId String?     @unique
+  status                String      // e.g., 'succeeded', 'pending', 'failed'
+  amountReturned        Float?      // Calculated after mess finalization
+
+  @@unique([userId, budgetCycleId])
+}
+
+model MiscellaneousExpense {
+  id            String       @id @default(cuid())
+  description   String
+  amount        Float
+  date          DateTime     @db.Date
+  addedById     String
+  addedBy       User         @relation(fields: [addedById], references: [id])
+  budgetCycleId String?
+  budgetCycle   BudgetCycle? @relation(fields: [budgetCycleId], references: [id])
+
+  createdAt DateTime @default(now())
+}
