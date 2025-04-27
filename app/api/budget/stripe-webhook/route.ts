@@ -139,10 +139,3 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
     });
   }
 }
-
-// This is needed to disable the default body parsing
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};

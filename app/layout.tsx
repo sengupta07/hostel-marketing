@@ -1,14 +1,16 @@
-"use client";
-
 import "./globals.css";
 import { Inter } from "next/font/google";
 import type React from "react";
-import { ThemeProvider } from "../components/theme-provider";
-import { SessionProvider } from "next-auth/react";
-import { ReduxProvider } from "../store/provider";
-import { Toaster } from "@/components/ui/toaster";
+import { Metadata } from "next";
+import ClientProviders from "./client-providers";
 
 const inter = Inter({ subsets: ["latin"] });
+
+export const metadata: Metadata = {
+  title: "Hostel Marketing Management",
+  description:
+    "A one step solution for managing hostel marketing tasks, bills, and budget cycles with role-based access control.",
+};
 
 export default function RootLayout({
   children,
@@ -18,19 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <SessionProvider>
-          <ReduxProvider>
-            <ThemeProvider
-              attribute="class"
-              defaultTheme="dark"
-              enableSystem={false}
-              disableTransitionOnChange
-            >
-              {children}
-              <Toaster />
-            </ThemeProvider>
-          </ReduxProvider>
-        </SessionProvider>
+        <ClientProviders>{children}</ClientProviders>
       </body>
     </html>
   );
