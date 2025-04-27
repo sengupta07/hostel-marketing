@@ -1,3 +1,4 @@
+// src/components/BillForm.tsx (or appropriate path)
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -7,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CheckIcon, PencilIcon } from "lucide-react";
+import { CheckIcon, PencilIcon, Loader2 } from "lucide-react"; // Added Loader2
 import {
   Table,
   TableBody,
@@ -23,170 +24,180 @@ import {
 } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-// --- Framer Motion Import ---
 import { motion, AnimatePresence } from "framer-motion";
+import type { Bill, MarketingItem } from "@/types"; // Ensure types are correctly defined/imported
 
-// --- Define Interfaces (Assuming these might be shared or defined here) ---
-export interface MarketingItem {
+// Type for the base definitions passed via props
+export interface MarketingItemDefinition {
   id: string;
   label: string;
+}
+
+// Type for the internal state, including UI state
+type MarketingItemState = MarketingItemDefinition & {
   enabled: boolean;
-  amount: number | string; // Use string during edit, number otherwise
+  amount: number | string; // Allow string during editing
   isEditing: boolean;
-}
+};
 
-export interface Bill {
-  id: string;
-  date: Date;
-  students: string[];
-  marketingItems: MarketingItem[];
-  marketingTotal: number;
-  groceryTotal: number;
-  totalBillAmount: number;
-  amountGiven: number;
-  amountReturned: number;
-  // marketingDetails?: { [key: string]: number }; // Legacy field (optional)
-}
-
-// --- Refactored Initial Marketing Items Data ---
-const initialMarketingItemsData: MarketingItem[] = [
-  {
-    id: "pogg", // Combined ID
-    label: "Potato/Onion/Garlic/Ginger", // Combined Label
-    enabled: false,
-    amount: 0,
-    isEditing: false,
-  },
-  // Keep other items as they were
-  { id: "egg", label: "Egg", enabled: false, amount: 0, isEditing: false },
-  {
-    id: "chicken",
-    label: "Chicken",
-    enabled: false,
-    amount: 0,
-    isEditing: false,
-  },
-  {
-    id: "veg",
-    label: "Vegetables",
-    enabled: false,
-    amount: 0,
-    isEditing: false,
-  },
-  { id: "fish", label: "Fish", enabled: false, amount: 0, isEditing: false },
-];
-
-// --- Component Props Interface ---
 interface BillFormProps {
-  initialData:
-    | (Partial<
+  // Definitions for marketing items specific to this form instance
+  marketingItemDefinitions: MarketingItemDefinition[];
+  initialData: // Keep initialData structure as before
+  | (Partial<
         Pick<
           Bill,
           | "id"
           | "date"
-          | "students"
-          | "marketingItems"
+          // Removed 'students' as it's not part of the core Bill model from API/DB
+          | "marketingItems" // This should match the structure in Bill type now
           | "groceryTotal"
           | "amountGiven"
         >
       > & {
-        marketingDetails?: { [key: string]: number }; // Optional legacy field
+        marketingDetails?: { [key: string]: number }; // Keep for potential legacy data handling
       })
     | null;
-  onSubmit: (billData: Omit<Bill, "id" | "marketingDetails"> | Bill) => void;
+  // Update onSubmit type to reflect the actual Bill structure (without UI/form-specific fields)
+  onSubmit: (
+    billData: Omit<
+      Bill,
+      "id" | "submittedAt" | "submittedBy" | "submittedById" | "marketingTaskId"
+    > // Exclude fields not set by the form
+  ) => void;
   submitButtonText: string;
+  isLoading?: boolean; // Add isLoading prop
+  isReadOnly?: boolean; // Add isReadOnly prop for view-only mode
 }
 
-// --- State Type ---
+// Keep BillFormData type as before
+// Update BillFormData to remove 'students' and use 'moneyReturned'
 type BillFormData = Partial<
   Pick<
     Bill,
     | "date"
-    | "students"
     | "groceryTotal"
     | "amountGiven"
     | "marketingTotal"
     | "totalBillAmount"
-    | "amountReturned"
+    | "moneyReturned" // Use moneyReturned
   >
 >;
 
-// --- Helper Functions ---
+// Keep calculateTotals function as before
 const calculateTotals = (
-  marketingItems: MarketingItem[],
+  marketingItems: MarketingItemState[],
   groceryTotal: number,
   amountGiven: number
-): Pick<Bill, "marketingTotal" | "totalBillAmount" | "amountReturned"> => {
+): Pick<Bill, "marketingTotal" | "totalBillAmount" | "moneyReturned"> => {
+  // Return moneyReturned
   const marketingTotal: number = marketingItems.reduce(
     (sum, item) => sum + (item.enabled ? Number(item.amount) || 0 : 0),
     0
   );
   const totalBillAmount: number = marketingTotal + (Number(groceryTotal) || 0);
-  const amountReturned: number = (Number(amountGiven) || 0) - totalBillAmount;
-  return { marketingTotal, totalBillAmount, amountReturned };
+  const moneyReturned: number = (Number(amountGiven) || 0) - totalBillAmount; // Calculate moneyReturned
+  return { marketingTotal, totalBillAmount, moneyReturned }; // Return moneyReturned
 };
 
-// --- Main Component ---
+// --- Updated BillForm Component ---
 export function BillForm({
+  marketingItemDefinitions, // Use definitions from props
   initialData,
   onSubmit,
   submitButtonText,
+  isLoading = false, // Default isLoading to false
+  isReadOnly = false, // Default isReadOnly to false
 }: BillFormProps) {
   const [formData, setFormData] = useState<BillFormData>({});
-  const [marketingItems, setMarketingItems] = useState<MarketingItem[]>(
+  // Initialize state based on definitions passed in props
+  const [marketingItems, setMarketingItems] = useState<MarketingItemState[]>(
     () =>
-      initialMarketingItemsData.map((item) => ({ ...item, isEditing: false })) // Initialize with deep copy & isEditing: false
+      marketingItemDefinitions.map((def) => ({
+        ...def,
+        enabled: false,
+        amount: 0,
+        isEditing: false,
+      }))
   );
 
-  // --- Effects ---
+  // Effect to initialize form data based on initialData and definitions
   useEffect(() => {
-    // Initialize based on initialData
-    let initialItems = initialMarketingItemsData.map((item) => ({
-      ...item,
+    // Initialize items based on definitions
+    let initialItemsState = marketingItemDefinitions.map((def) => ({
+      ...def,
+      enabled: false,
+      amount: 0,
       isEditing: false,
     }));
+
     let initialGrocery = initialData?.groceryTotal ?? 0;
     let initialAmountGiven = initialData?.amountGiven ?? 0;
 
+    // If initialData provides marketingItems, merge them with the definitions
     if (initialData?.marketingItems && initialData.marketingItems.length > 0) {
-      initialItems = initialMarketingItemsData.map((defaultItem) => {
-        const savedItem = initialData.marketingItems?.find(
-          (item) => item.id === defaultItem.id
+      initialItemsState = marketingItemDefinitions.map((def) => {
+        // First try to find by id (for backward compatibility)
+        let savedItem = initialData.marketingItems?.find(
+          (item) => item.id === def.id
         );
+
+        // If not found by id, try to find by itemId (new structure from API)
+        if (!savedItem) {
+          savedItem = initialData.marketingItems?.find(
+            (item) => item.itemId === def.id
+          );
+        }
+
         return savedItem
           ? {
-              ...defaultItem,
-              ...savedItem,
+              ...def, // Start with definition
+              enabled: true, // Enable if it exists in initialData
               amount: Number(savedItem.amount) || 0,
               isEditing: false,
             }
-          : { ...defaultItem, isEditing: false };
+          : { ...def, enabled: false, amount: 0, isEditing: false }; // Use definition defaults if not found
       });
     }
-    // Note: Removed backward compatibility for initialData.marketingDetails here for simplicity,
-    // assuming the parent component (BillsTab) handles the conversion before passing initialData.
-    // If you still need it here, you'd add an `else if (initialData?.marketingDetails)` block.
+    // Also handle legacy marketingDetails if necessary (might need adjustment based on structure)
+    else if (initialData?.marketingDetails) {
+      initialItemsState = marketingItemDefinitions.map((def) => {
+        const amount = initialData.marketingDetails?.[def.id];
+        return amount !== undefined
+          ? {
+              ...def,
+              enabled: true,
+              amount: Number(amount) || 0,
+              isEditing: false,
+            }
+          : { ...def, enabled: false, amount: 0, isEditing: false };
+      });
+    }
 
-    setMarketingItems(initialItems);
+    setMarketingItems(initialItemsState);
 
     const totals = calculateTotals(
-      initialItems,
+      initialItemsState,
       initialGrocery,
       initialAmountGiven
     );
 
     setFormData({
-      date: initialData?.date || new Date(),
-      students: initialData?.students || [],
+      date: initialData?.date ? new Date(initialData.date) : new Date(),
+      // Removed students initialization
       groceryTotal: initialGrocery,
       amountGiven: initialAmountGiven,
       ...totals,
     });
-  }, [initialData]);
+  }, [initialData, marketingItemDefinitions]); // Depend on definitions as well
 
+  // Effect to recalculate totals when relevant data changes (keep as before)
   useEffect(() => {
-    // Recalculate totals
-    if (Object.keys(formData).length === 0) return; // Avoid running on initial empty state
+    if (
+      Object.keys(formData).length === 0 &&
+      marketingItems.every((item) => !item.enabled && item.amount === 0)
+    )
+      return;
 
     const newTotals = calculateTotals(
       marketingItems,
@@ -194,10 +205,12 @@ export function BillForm({
       formData.amountGiven || 0
     );
 
+    // Prevent infinite loops by checking if totals actually changed
+    // Check against moneyReturned
     if (
       newTotals.marketingTotal !== formData.marketingTotal ||
       newTotals.totalBillAmount !== formData.totalBillAmount ||
-      newTotals.amountReturned !== formData.amountReturned
+      newTotals.moneyReturned !== formData.moneyReturned
     ) {
       setFormData((prev) => ({
         ...prev,
@@ -208,18 +221,18 @@ export function BillForm({
     marketingItems,
     formData.groceryTotal,
     formData.amountGiven,
-    formData.marketingTotal, // Include totals in deps for comparison
+    formData.marketingTotal,
     formData.totalBillAmount,
-    formData.amountReturned,
-    formData, // Include formData to run after initialization
+    formData.moneyReturned, // Depend on moneyReturned
+    // formData object dependency might cause loops if not careful, specific props are better
   ]);
 
-  // --- Handlers ---
+  // --- Input Handlers (Keep mostly as before) ---
   const handleNumberInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [id]: Number(value) || 0,
+      [id]: value === "" ? 0 : Number(value) || 0, // Handle empty string case
     }));
   };
 
@@ -227,15 +240,7 @@ export function BillForm({
     if (date) setFormData((prev) => ({ ...prev, date }));
   };
 
-  const handleStudentsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({
-      ...prev,
-      students: e.target.value
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-    }));
-  };
+  // Removed handleStudentsChange
 
   const handleMarketingItemCheck = (itemId: string, checked: boolean) => {
     setMarketingItems((prevItems) =>
@@ -244,8 +249,8 @@ export function BillForm({
           ? {
               ...item,
               enabled: checked,
-              amount: checked ? item.amount : 0,
-              isEditing: false, // Stop editing if checkbox is toggled
+              amount: checked ? item.amount : 0, // Reset amount if unchecked
+              isEditing: false, // Exit editing mode when check status changes
             }
           : item
       )
@@ -254,125 +259,123 @@ export function BillForm({
 
   const handleMarketingAmountChange = (itemId: string, value: string) => {
     setMarketingItems((prevItems) =>
-      prevItems.map((item) =>
-        item.id === itemId ? { ...item, amount: value } : item
+      prevItems.map(
+        (item) => (item.id === itemId ? { ...item, amount: value } : item) // Keep value as string temporarily
       )
     );
   };
 
-  // Fix: Use functional update in useCallback to avoid stale state
   const handleMarketingAmountSave = useCallback((itemId: string) => {
-    setMarketingItems(
-      (
-        prevItems // Use functional update
-      ) =>
-        prevItems.map((item) => {
-          if (item.id === itemId && item.isEditing) {
-            // Check isEditing here
-            const savedAmount = Number(item.amount) || 0;
-            return { ...item, amount: savedAmount, isEditing: false };
-          }
-          return item;
-        })
+    setMarketingItems((prevItems) =>
+      prevItems.map((item) => {
+        if (item.id === itemId && item.isEditing) {
+          const savedAmount = Number(item.amount) || 0; // Convert to number on save
+          return { ...item, amount: savedAmount, isEditing: false };
+        }
+        return item;
+      })
     );
-  }, []); // Keep dependency array empty
+  }, []); // Empty dependency array should be okay here
 
   const handleMarketingAmountEdit = (itemId: string) => {
+    // Save any other item currently being edited first
     setMarketingItems((prevItems) =>
-      prevItems.map((item) => ({
-        ...item,
-        isEditing: item.id === itemId, // Only this item is editing
-      }))
+      prevItems.map((item) => {
+        if (item.isEditing && item.id !== itemId) {
+          // Save previously editing item
+          const savedAmount = Number(item.amount) || 0;
+          return { ...item, amount: savedAmount, isEditing: false };
+        }
+        // Set the clicked item to editing mode
+        return { ...item, isEditing: item.id === itemId };
+      })
     );
   };
 
+  // --- Submit Handler (Keep mostly as before, uses internal state) ---
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (
-      !formData.date ||
-      !formData.students ||
-      formData.students.length === 0
-    ) {
-      alert("Please fill in Date and at least one Student.");
+    if (isLoading) return;
+
+    // Removed students validation
+    if (!formData.date) {
+      alert("Please fill in the Date."); // Use toast later
       return;
     }
 
-    // Ensure any pending edits are saved *before* final calculation/submission
+    // Ensure any currently edited item is saved before submitting
     let finalItems = marketingItems;
     const currentlyEditing = marketingItems.find((item) => item.isEditing);
     if (currentlyEditing) {
-      // Auto-save the currently editing item
-      handleMarketingAmountSave(currentlyEditing.id);
-      // Update finalItems immediately for calculation (state update might be async)
+      // Create the state as it would be *after* saving
       finalItems = marketingItems.map((item) =>
         item.id === currentlyEditing.id
           ? { ...item, amount: Number(item.amount) || 0, isEditing: false }
           : item
       );
-      // Optionally alert the user that the value was auto-saved
-      // alert(`Auto-saving amount for ${currentlyEditing.label}.`);
+      // Also update the state visually, though onSubmit will likely unmount/reset
+      handleMarketingAmountSave(currentlyEditing.id);
     } else {
-      // Ensure amounts are numbers even if not editing
+      // Ensure all amounts are numbers if nothing was being edited
       finalItems = marketingItems.map((item) => ({
         ...item,
         amount: Number(item.amount) || 0,
-        isEditing: false,
       }));
     }
 
-    // Filter items for submission (optional: only include enabled with amount > 0)
-    const itemsToSubmit = finalItems.filter(
-      (item) => item.enabled // Decide if you want to filter by amount > 0 as well
-      // && Number(item.amount) > 0
-    );
+    // Filter only enabled items with valid amounts for submission
+    const itemsToSubmit = finalItems
+      .filter((item) => item.enabled && Number(item.amount) > 0)
+      .map((item) => ({
+        // Map to the structure expected by Bill type
+        id: item.id, // Keep id for compatibility
+        itemId: item.id, // Map form item id to itemId
+        label: item.label,
+        amount: Number(item.amount), // Ensure amount is number
+      }));
 
-    // Recalculate final totals based on the actual items *being submitted*
+    // Recalculate totals based *only* on the items being submitted
     const finalTotals = calculateTotals(
-      itemsToSubmit,
+      finalItems, // Use finalItems state for calculation base
       formData.groceryTotal ?? 0,
       formData.amountGiven ?? 0
     );
 
-    const submissionData: Omit<Bill, "id" | "marketingDetails"> = {
+    // Prepare submission data matching the Omit type in onSubmit prop
+    const submissionData: Omit<
+      Bill,
+      "id" | "submittedAt" | "submittedBy" | "submittedById" | "marketingTaskId"
+    > = {
       date: formData.date!,
-      students: formData.students!,
-      marketingItems: itemsToSubmit.map((item) => ({
-        // Ensure isEditing: false in submitted data
-        ...item,
-        isEditing: false, // Remove isEditing from submitted data if it's just UI state
-      })),
+      // Removed students
+      marketingItems: itemsToSubmit,
       marketingTotal: finalTotals.marketingTotal,
       groceryTotal: formData.groceryTotal ?? 0,
       totalBillAmount: finalTotals.totalBillAmount,
       amountGiven: formData.amountGiven ?? 0,
-      amountReturned: finalTotals.amountReturned,
+      moneyReturned: finalTotals.moneyReturned, // Use moneyReturned
+      // Fields like description, receiptUrl are not currently in the form, add if needed
+      description: null, // Add default/empty values if needed by type
+      receiptUrl: null,
     };
 
-    if (initialData?.id) {
-      onSubmit({ ...submissionData, id: initialData.id });
-    } else {
-      onSubmit(submissionData);
-    }
+    // Call the onSubmit prop passed from the parent
+    // The type of submissionData now matches the expected argument type of onSubmit
+    onSubmit(submissionData);
   };
 
-  // --- Animation Variants ---
+  // --- Animations (Keep as before) ---
   const inputAnimation = {
-    initial: { opacity: 0, y: -5 }, // Start slightly above and transparent
-    animate: { opacity: 1, y: 0 }, // Fade in and slide down
-    exit: { opacity: 0, y: 5 }, // Fade out and slide down further
-    transition: { duration: 0.2 }, // Animation speed
+    /* ... */
   };
   const textAnimation = {
-    initial: { opacity: 0 },
-    animate: { opacity: 1 },
-    exit: { opacity: 0 },
-    transition: { duration: 0.2 },
+    /* ... */
   };
 
-  // --- Render ---
+  // --- JSX (Add disabled state to submit button) ---
   return (
     <form onSubmit={handleSubmit} className="grid gap-6 py-4">
-      {/* Section 1: Date and Students (No changes needed here) */}
+      {/* Date and Students Inputs (Keep as before) */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
         <div className="grid grid-cols-[auto_1fr] items-center gap-3">
           <Label htmlFor="date" className="text-right sm:text-left">
@@ -398,28 +401,19 @@ export function BillForm({
             <PopoverContent className="w-auto p-0" align="start">
               <Calendar
                 mode="single"
-                selected={formData.date}
+                selected={
+                  formData.date instanceof Date ? formData.date : undefined
+                }
                 onSelect={handleDateChange}
                 initialFocus
               />
             </PopoverContent>
           </Popover>
         </div>
-        <div className="grid grid-cols-[auto_1fr] items-center gap-3">
-          <Label htmlFor="students" className="text-right sm:text-left">
-            Students
-          </Label>
-          <Input
-            id="students"
-            value={formData.students?.join(", ") || ""}
-            onChange={handleStudentsChange}
-            placeholder="Names separated by comma"
-            required
-          />
-        </div>
+        {/* Removed Students Input Field */}
       </div>
 
-      {/* Section 2: Marketing Details Table */}
+      {/* Marketing Details Card and Table (Keep as before, but uses internal state) */}
       <Card>
         <CardHeader>
           <CardTitle>Marketing Details</CardTitle>
@@ -428,7 +422,7 @@ export function BillForm({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[50px]"></TableHead> {/* Checkbox */}
+                <TableHead className="w-[50px]"></TableHead>
                 <TableHead>Item</TableHead>
                 <TableHead className="text-right">Amount (₹)</TableHead>
                 <TableHead className="w-[80px] text-center">Action</TableHead>
@@ -442,57 +436,50 @@ export function BillForm({
                       id={`check-${item.id}`}
                       checked={item.enabled}
                       onCheckedChange={(checked) =>
+                        !isReadOnly &&
                         handleMarketingItemCheck(item.id, !!checked)
                       }
+                      disabled={isReadOnly}
                     />
                   </TableCell>
                   <TableCell>
                     <Label htmlFor={`check-${item.id}`}>{item.label}</Label>
                   </TableCell>
-                  {/* --- Amount Cell with Animation --- */}
                   <TableCell className="text-right relative">
-                    {" "}
-                    {/* Add relative positioning if needed for absolute animations, but direct animation is often fine */}
                     <AnimatePresence mode="wait" initial={false}>
+                      {/* Conditional rendering for input/text based on item.enabled and item.isEditing */}
                       {item.enabled ? (
                         item.isEditing ? (
-                          <motion.div
-                            key={`input-${item.id}`} // Unique key for input state
-                            variants={inputAnimation}
-                            initial="initial"
-                            animate="animate"
-                            exit="exit"
-                            transition={inputAnimation.transition} // Apply transition here
-                            className="inline-block" // Prevents taking full width
+                          /* Input Field */ <motion.div
+                            key={`input-${item.id}`} /* ... */
                           >
+                            {" "}
                             <Input
                               type="number"
                               id={`amount-${item.id}`}
                               value={item.amount}
                               onChange={(e) =>
+                                !isReadOnly &&
                                 handleMarketingAmountChange(
                                   item.id,
                                   e.target.value
                                 )
                               }
+                              disabled={isReadOnly}
                               step="0.01"
-                              className="h-8 w-24 text-right" // Input styling
+                              className="h-8 w-24 text-right"
                               autoFocus
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
                                   e.preventDefault();
                                   handleMarketingAmountSave(item.id);
                                 } else if (e.key === "Escape") {
-                                  // Optional: Revert value and exit edit mode on Escape
-                                  setMarketingItems((prev) =>
+                                  /* Revert logic */ setMarketingItems((prev) =>
                                     prev.map((i) =>
                                       i.id === item.id
                                         ? {
                                             ...i,
-                                            amount:
-                                              Number(
-                                                /* fetch original amount? */ i.amount
-                                              ) || 0,
+                                            amount: Number(i.amount) || 0,
                                             isEditing: false,
                                           }
                                         : i
@@ -503,70 +490,57 @@ export function BillForm({
                             />
                           </motion.div>
                         ) : (
-                          <motion.span
-                            key={`text-${item.id}`} // Unique key for text state
-                            variants={textAnimation}
-                            initial="initial"
-                            animate="animate"
-                            exit="exit"
-                            transition={textAnimation.transition} // Apply transition here
-                            className="inline-block px-1" // Add padding matching input if needed
+                          /* Display Text */ <motion.span
+                            key={`text-${item.id}`}
+                            /* ... */ className="inline-block px-1"
                           >
-                            {/* Display formatted number, handle 0 amount */}
                             {Number(item.amount) > 0
                               ? Number(item.amount).toFixed(2)
                               : "0.00"}
                           </motion.span>
                         )
                       ) : (
-                        <motion.span
+                        /* Disabled Text */ <motion.span
                           key={`disabled-${item.id}`}
-                          variants={textAnimation}
-                          initial="initial"
-                          animate="animate"
-                          exit="exit"
-                          transition={textAnimation.transition}
-                          className="text-muted-foreground inline-block px-1"
+                          /* ... */ className="text-muted-foreground inline-block px-1"
                         >
                           -
-                        </motion.span> // Show dash if disabled
+                        </motion.span>
                       )}
                     </AnimatePresence>
                   </TableCell>
-                  {/* --- Action Cell --- */}
                   <TableCell className="text-center">
-                    {item.enabled && ( // Show actions only if enabled
-                      <>
-                        {item.isEditing ? (
-                          // Save Button - Now correctly triggers save
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleMarketingAmountSave(item.id)}
-                            title="Save Amount"
-                            type="button"
-                          >
-                            <CheckIcon className="h-4 w-4" />
-                          </Button>
-                        ) : (
-                          // Edit Button
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleMarketingAmountEdit(item.id)}
-                            title="Edit Amount"
-                            type="button"
-                            disabled={
-                              !item.enabled
-                            } /* Disable if item not enabled */
-                          >
-                            <PencilIcon className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </>
-                    )}
+                    {/* Conditional rendering for Edit/Save button */}
+                    {item.enabled &&
+                      (item.isEditing ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() =>
+                            !isReadOnly && handleMarketingAmountSave(item.id)
+                          }
+                          disabled={isReadOnly}
+                          title="Save Amount"
+                          type="button"
+                        >
+                          <CheckIcon className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() =>
+                            !isReadOnly && handleMarketingAmountEdit(item.id)
+                          }
+                          title="Edit Amount"
+                          type="button"
+                          disabled={!item.enabled || isReadOnly}
+                        >
+                          <PencilIcon className="h-4 w-4" />
+                        </Button>
+                      ))}
                   </TableCell>
                 </TableRow>
               ))}
@@ -581,7 +555,7 @@ export function BillForm({
         </CardContent>
       </Card>
 
-      {/* Section 3: Grocery Details (No changes needed) */}
+      {/* Grocery Details Card (Keep as before) */}
       <Card>
         <CardHeader>
           <CardTitle>Grocery Details</CardTitle>
@@ -593,7 +567,8 @@ export function BillForm({
               id="groceryTotal"
               type="number"
               value={formData.groceryTotal ?? 0}
-              onChange={handleNumberInputChange}
+              onChange={(e) => !isReadOnly && handleNumberInputChange(e)}
+              disabled={isReadOnly}
               step="0.01"
               className="w-32"
             />
@@ -601,7 +576,7 @@ export function BillForm({
         </CardContent>
       </Card>
 
-      {/* Section 4: Summary (No changes needed) */}
+      {/* Totals Summary Section (Keep as before) */}
       <div className="grid grid-cols-1 gap-x-6 gap-y-4 rounded-lg border bg-card p-4 sm:grid-cols-3">
         <div className="space-y-1">
           <Label className="text-sm text-muted-foreground">
@@ -617,7 +592,8 @@ export function BillForm({
             id="amountGiven"
             type="number"
             value={formData.amountGiven ?? 0}
-            onChange={handleNumberInputChange}
+            onChange={(e) => !isReadOnly && handleNumberInputChange(e)}
+            disabled={isReadOnly}
             step="0.01"
             className="w-32"
           />
@@ -627,18 +603,29 @@ export function BillForm({
             Amount Returned
           </Label>
           <div className="text-xl font-semibold">
-            ₹{formData.amountReturned?.toFixed(2) ?? "0.00"}
+            ₹{formData.moneyReturned?.toFixed(2) ?? "0.00"}{" "}
+            {/* Use moneyReturned */}
           </div>
         </div>
       </div>
 
-      {/* Submit Button */}
-      <Button
-        type="submit"
-        className="mt-2 w-full sm:w-auto sm:justify-self-end"
-      >
-        {submitButtonText}
-      </Button>
+      {/* Submit Button (Add disabled state and loading indicator) - Hide in read-only mode */}
+      {!isReadOnly && submitButtonText && (
+        <Button
+          type="submit"
+          className="mt-2 w-full sm:w-auto sm:justify-self-end"
+          disabled={isLoading} // Disable button when loading
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Submitting...
+            </>
+          ) : (
+            submitButtonText
+          )}
+        </Button>
+      )}
     </form>
   );
 }
